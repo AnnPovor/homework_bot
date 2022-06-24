@@ -46,7 +46,8 @@ HOMEWORK_STATUSES = {
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат,
-    определяемый переменной окружения TELEGRAM_CHAT_ID"""
+    определяемый переменной окружения TELEGRAM_CHAT_ID
+    """
 
     logger.info('Отправка сообщения')
     return bot.send_message(TELEGRAM_CHAT_ID, message)
@@ -56,7 +57,8 @@ def get_api_answer(current_timestamp):
     """Делает запрос к API-сервису.
     В качестве параметра получает временную метку.
     В случае успешного запроса должна вернуть ответ API,
-    преобразовав его из формата JSON к типам данных Python."""
+    преобразовав его из формата JSON к типам данных Python.
+    """
 
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
@@ -80,8 +82,8 @@ def check_response(response):
     """Проверяет ответ API на корректность.
     В качестве параметра получает ответ API, приведенный к типам данных Python.
     Если ответ API соответствует ожиданиям, то функция должна вернуть список
-    домашних работ, доступный в ответе API по ключу 'homeworks'"""
-
+    домашних работ, доступный в ответе API по ключу 'homeworks
+    """
     if type(response) is not dict:
         raise TypeError('Ответ API не соответствует ожидаемому')
     try:
@@ -99,10 +101,10 @@ def check_response(response):
 
 def parse_status(homework):
     """Извлекает из информации статус работы.
-    В качестве параметра функция получает один элемент из списка домашних работ.
+    В качестве параметра функция получает один элемент из списка работ.
     В случае успеха, функция возвращает в Telegram строку,
-    содержащую один из вердиктов словаря HOMEWORK_STATUSES."""
-
+    содержащую один из вердиктов словаря HOMEWORK_STATUSES.
+    """
     if 'homework_name' not in homework:
         raise KeyError('Отсутствует ключ "homework_name" в ответе API')
     if 'status' not in homework:
@@ -118,15 +120,14 @@ def parse_status(homework):
 def check_tokens():
     """Проверяет доступность переменных окруженияю.
     Если отсутствует хотя бы одна переменная окружения — функция должна
-    вернуть False, иначе — True."""
-
+    вернуть False, иначе — True.
+    """
     if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
         return True
 
 
 def main():
     """Основная логика работы бота."""
-
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
 
