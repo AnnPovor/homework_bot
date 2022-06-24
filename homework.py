@@ -45,10 +45,7 @@ HOMEWORK_STATUSES = {
 
 
 def send_message(bot, message):
-    """Отправляет сообщение в Telegram чат,
-    определяемый переменной окружения TELEGRAM_CHAT_ID
-    """
-
+    """Отправляет сообщение в Telegram чат."""
     logger.info('Отправка сообщения')
     return bot.send_message(TELEGRAM_CHAT_ID, message)
 
@@ -59,7 +56,6 @@ def get_api_answer(current_timestamp):
     В случае успешного запроса должна вернуть ответ API,
     преобразовав его из формата JSON к типам данных Python.
     """
-
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
