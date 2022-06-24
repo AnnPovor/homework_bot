@@ -18,7 +18,8 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-handler = RotatingFileHandler('my_logger.log', maxBytes=50000000, backupCount=5)
+handler = RotatingFileHandler(
+    'my_logger.log', maxBytes=50000000, backupCount=5)
 logger.addHandler(handler)
 
 logging.debug('123')
@@ -101,6 +102,7 @@ def parse_status(homework):
     В качестве параметра функция получает один элемент из списка домашних работ.
     В случае успеха, функция возвращает в Telegram строку,
     содержащую один из вердиктов словаря HOMEWORK_STATUSES."""
+
     if 'homework_name' not in homework:
         raise KeyError('Отсутствует ключ "homework_name" в ответе API')
     if 'status' not in homework:
@@ -134,13 +136,14 @@ def main():
             if new_homework.get('homeworks'):
                 send_message(parse_status(
                     new_homework.get('homeworks')[0]), bot)
-            current_timestamp = new_homework.get(
-            'current_date', current_timestamp)
+            current_timestamp = new_homework.get('current_date',
+                                                 current_timestamp)
             time.sleep(RETRY_TIME)
 
         except Exception as error:
             print(f'Ошибка у бота: {error}')
             time.sleep(5)
+
 
 if __name__ == '__main__':
     main()
