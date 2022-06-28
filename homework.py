@@ -39,7 +39,7 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.info('Сообщение отправлено')
-    except TelegramException as error:
+    except TelegramException:
         raise TelegramException
 
 
@@ -109,7 +109,8 @@ def parse_status(homework):
 
 
 def check_tokens():
-    """Проверяет доступность переменных окруженияю.
+    """
+    Проверяет доступность переменных окруженияю.
     Если отсутствует хотя бы одна переменная окружения — функция должна
     вернуть False, иначе — True.
     """
@@ -118,7 +119,6 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-
     if not check_tokens():
         logger.critical('Отсутствуют переменные окружения!')
         raise SystemExit
@@ -130,9 +130,12 @@ def main():
     while True:
         try:
             response = get_api_answer(current_timestamp)
+        except ConnectionException as error:
+            logger.error(f'Недоступность эндпоинта {error}')
+        try:
             homework = check_response(response)
             if len(homework) >= 1:
-                # current_report['name'] = homework['homework_name']
+                current_report['name'] = homework['homework_name']
                 status = parse_status(homework[0])
                 send_message(status, bot)
                 current_timestamp = int(time.time())
