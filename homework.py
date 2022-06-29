@@ -1,9 +1,11 @@
 import logging
 import os
+import sys
 import time
 from http import HTTPStatus
 from logging.handlers import RotatingFileHandler
 from typing import Dict
+
 import requests
 import telegram
 from dotenv import load_dotenv
@@ -39,8 +41,8 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.info('Сообщение отправлено')
-    except TelegramException:
-        raise TelegramException
+    except TelegramException as error:
+        raise TelegramException(f'Сообщение не отправлено, ошибка: {error}')
 
 
 def get_api_answer(current_timestamp):
@@ -96,12 +98,12 @@ def parse_status(homework):
     В случае успеха, функция возвращает в Telegram строку,
     содержащую один из вердиктов словаря HOMEWORK_STATUSES.
     """
-    homework_name = homework['homework_name']
-    homework_status = homework['status']
     if 'homework_name' not in homework:
         raise KeyError('Отсутствует ключ "homework_name" в ответе API')
     if 'status' not in homework:
         raise KeyError('Отсутствует ключ "status" в ответе API')
+    homework_name = homework.get('homework_name')
+    homework_status = homework.get('status')
     if homework_status not in HOMEWORK_STATUSES:
         raise ValueError
     verdict = HOMEWORK_STATUSES[homework_status]
@@ -120,8 +122,9 @@ def check_tokens():
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
-        logger.critical('Отсутствуют переменные окружения!')
-        raise SystemExit
+        msg = 'Отсутствуют переменные окружения!'
+        logger.critical(msg)
+        sys.exit(msg)
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
     current_report = {'name': '', 'output': ''}
@@ -130,14 +133,15 @@ def main():
     while True:
         try:
             response = get_api_answer(current_timestamp)
+            homeworks = check_response(response)
         except ConnectionException as error:
             logger.error(f'Недоступность эндпоинта {error}')
         try:
-            homework = check_response(response)
-            if len(homework) >= 1:
+            for homework in homeworks:
                 current_report['name'] = homework['homework_name']
-                status = parse_status(homework[0])
-                send_message(status, bot)
+                current_report['output'] = homework['"reviewer_comment']
+                status = parse_status(homework)
+                send_message(bot, status)
                 current_timestamp = int(time.time())
             else:
                 logger.debug('Новых статусов нет')
