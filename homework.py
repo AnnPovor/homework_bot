@@ -63,15 +63,11 @@ def get_api_answer(current_timestamp):
 
     if response.status_code != HTTPStatus.OK:
         status_code = response.status_code
-        msg = f'Ошибка {status_code}'
-        logger.error(msg)
-        raise Exception(msg)
+        raise Exception(f'Ошибка {status_code}')
     try:
         return response.json()
     except ValueError:
-        msg = 'Ответ не преобразовался в формат json'
-        logger.error(msg)
-        raise ValueError(msg)
+        raise ValueError('Ответ не преобразовался в формат json')
 
 
 def check_response(response):
@@ -135,9 +131,6 @@ def main():
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
-        except ConnectionException as error:
-            logger.error(f'Недоступность эндпоинта {error}')
-        try:
             for homework in homeworks:
                 current_report['name'] = homework['homework_name']
                 current_report['output'] = homework['"reviewer_comment']
@@ -147,7 +140,8 @@ def main():
             else:
                 logger.debug('Новых статусов нет')
         except Exception as error:
-            logger.error(f'Ошибка у бота {error}')
+            msg = f'Ошибка у бота {error}'
+            logging.error(msg, exc_info=True)
         try:
             if current_report != prev_report:
                 send_message(current_report.copy(), bot)
