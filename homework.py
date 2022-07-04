@@ -10,16 +10,19 @@ import requests
 import telegram
 from dotenv import load_dotenv
 
-from exceptions import ConnectionException, NotResponseException
-from exceptions import TelegramException, WrongAnswerException
-
+from exceptions import (
+    ConnectionError, EmptyAPIResponseError, NotForSendingError,
+    TelegramError, WrongAPIResponseCodeError
+)
 load_dotenv()
 
 logging.basicConfig(
     level=logging.DEBUG,
-    filename='main.log',
-    format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
-)
+    format=(
+        '%(asctime)s %(levelname)s - '
+        '(%(filename)s).%(funcName)s:%(lineno)d - %(message)s'
+    ))
+logger = logging.getLogger(__name__)
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -39,10 +42,12 @@ HOMEWORK_STATUSES = {
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
     try:
+        logger.info(f'Отправляем сообщение в телеграм: {message}')
         bot.send_message(TELEGRAM_CHAT_ID, message)
-        logger.info('Сообщение отправлено')
-    except TelegramException as error:
-        raise TelegramException(f'Сообщение не отправлено, ошибка: {error}')
+    except telegram.error.TelegramError as error:
+        raise TelegramError(f'Сообщение не отправлено, ошибка: {error}')
+    else:
+        logger.info('Телеграм сообщение отправлено.')
 
 
 def get_api_answer(current_timestamp):
@@ -55,19 +60,25 @@ def get_api_answer(current_timestamp):
     """
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
-
+    request_params = {
+        'url': ENDPOINT,
+        'headers': HEADERS,
+        'params': params
+    }
     try:
-        response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-    except ConnectionException as error:
-        raise ConnectionException(f'Недоступность эндпоинта {error}')
-
-    if response.status_code != HTTPStatus.OK:
-        status_code = response.status_code
-        raise Exception(f'Ошибка {status_code}')
-    try:
+        logger.info(
+            (
+                'Начинаем подключение к эндпоинту {url}, с параметрами'
+                ' headers = {headers}; params= {params}.'
+            ).format(**request_params)
+        )
+        response = requests.get(**request_params)
+        if response.status_code != HTTPStatus.OK:
+            status_code = response.status_code
+            raise WrongAPIResponseCodeError(f'Ошибка {status_code}')
         return response.json()
-    except ValueError:
-        raise ValueError('Ответ не преобразовался в формат json')
+    except Exception as error:
+        raise ConnectionError(f'Недоступность эндпоинта {error}')
 
 
 def check_response(response):
@@ -78,13 +89,16 @@ def check_response(response):
     Если ответ API соответствует ожиданиям, то функция должна вернуть список
     домашних работ, доступный в ответе API по ключу 'homeworks'
     """
+    logger.info(
+        'Приступаю к проверке ответа от API.'
+    )
     if not isinstance(response, dict):
         raise TypeError('В ответе нет словаря')
     if 'homeworks' not in response or 'current_date' not in response:
-        raise NotResponseException('Ключей нет в списке')
+        raise EmptyAPIResponseError('Ключей нет в списке')
     homeworks = response.get('homeworks')
     if not isinstance(homeworks, list):
-        raise WrongAnswerException('Тип homeworks - не список')
+        raise KeyError('Тип homeworks - не список')
     return homeworks
 
 
@@ -131,28 +145,34 @@ def main():
         try:
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
-            for homework in homeworks:
+            if homeworks:
+                homework = homeworks[0]
                 current_report['name'] = homework['homework_name']
-                current_report['output'] = homework['"reviewer_comment']
-                status = parse_status(homework)
-                send_message(bot, status)
-                current_timestamp = int(time.time())
+                current_report['output'] = parse_status(homework)
             else:
-                logger.debug('Новых статусов нет')
+                current_report['output'] = 'домашних работ нет.'
+            if current_report != prev_report:
+                send_message(bot, message=current_report['output'])
+                prev_report = current_report.copy()
+            else:
+                logger.debug('В ответе нет новых статусов.')
+        except NotForSendingError as error:
+            logger.exception(error)
         except Exception as error:
             msg = f'Ошибка у бота {error}'
-            logging.error(msg, exc_info=True)
-        try:
+            current_report['output'] = msg
             if current_report != prev_report:
-                send_message(current_report.copy(), bot)
+                send_message(bot, current_report['output'])
+                prev_report = current_report.copy()
         finally:
             time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     handler = RotatingFileHandler(
-        'my_logger.log', maxBytes=50000000, backupCount=5)
+        'my_logger.log', encoding='utf-8', maxBytes=50000000, backupCount=5)
     logger.addHandler(handler)
+    h1 = logging.StreamHandler(sys.stdout)
+    logger.addHandler(h1)
     main()
